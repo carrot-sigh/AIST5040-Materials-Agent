@@ -15,3 +15,8 @@ checkpoints/
 *.ckpt
 *.pth
 *.safetensors
+
+# Python packaging
+*.egg-info/
+build/
+dist/
