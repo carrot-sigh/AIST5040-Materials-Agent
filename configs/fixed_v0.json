@@ -1,0 +1,49 @@
+{
+  "experiment": "mattergen_fixed_chgnet_ranking_v0",
+  "seed": 42,
+  "generator": {
+    "repository": "microsoft/mattergen",
+    "checkpoint": "mattergen_base",
+    "checkpoint_revision": "5244495dd9a979ff71abc7548a0b14b9deb0069a",
+    "candidate_budget": 64,
+    "requested_batch_size": 4,
+    "effective_batch_size": 64,
+    "num_batches": 1,
+    "note": "The completed run used batch_size=64 because the then-current wrapper failed to propagate the requested batch size. The wrapper is fixed; a new run with requested_batch_size=4 uses 16 batches."
+  },
+  "validation": {
+    "minimum_periodic_atomic_distance_angstrom": 0.5,
+    "structure_matcher": {
+      "primitive_cell": false,
+      "scale": true,
+      "attempt_supercell": false
+    }
+  },
+  "scoring": {
+    "model": "CHGNet",
+    "version": "0.4.2",
+    "method": "single_point",
+    "ranking_score": "initial_maximum_atomic_force_norm_eV_per_angstrom",
+    "sort": "ascending",
+    "tie_breaker": "candidate_id"
+  },
+  "selection_budget": 8,
+  "relaxation": {
+    "model": "CHGNet",
+    "version": "0.4.2",
+    "budget": 8,
+    "device": "cuda:0",
+    "fmax_eV_per_angstrom": 0.05,
+    "max_steps": 500,
+    "relax_cell": true
+  },
+  "environment": {
+    "python": "3.10.20",
+    "pytorch": "2.7.1+cu128",
+    "pytorch_geometric": "2.7.0",
+    "pymatgen": "2024.10.29",
+    "mattergen_git_commit": "92423660a8bd70e83679086e88f88596d484dc16",
+    "agent_repository_commit": "0297028e72e3f3591f5976c9c82d337a09549b74"
+  },
+  "outputs": "results/fixed_v0/"
+}

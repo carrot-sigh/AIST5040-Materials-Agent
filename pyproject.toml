@@ -10,3 +10,6 @@ dependencies = []
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.scripts]
+materials-fixed-screening = "materials_agent.baselines.fixed_screening:main"

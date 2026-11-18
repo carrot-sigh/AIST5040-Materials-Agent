@@ -1,51 +1,70 @@
 # AIST5040 Materials Agent
 
-MatterGen candidate generation and CHGNet prediction/relaxation for AIST5040.
+Research software for budget-constrained, physics-guided crystal discovery. The project compares candidate search policies using a fixed MatterGen generation pool and explicit CHGNet scoring and relaxation budgets.
 
-## Layout
+The current internal baseline is an **adapted MatterGen + Fixed CHGNet Ranking** workflow. It ranks valid, unique candidates by the maximum atomic-force norm from an unrelaxed CHGNet single-point calculation, then relaxes a fixed Top-K. This is not a full reproduction of MADE and the force score is not a thermodynamic stability metric.
 
-Keep the two repositories independent:
+## Current status
+
+- MatterGen `mattergen_base` candidate generation with a recorded seed.
+- CIF validation, minimum periodic-distance screening, stable candidate IDs and `StructureMatcher` deduplication.
+- CHGNet single-point energy/force calculation and deterministic fixed ranking.
+- CHGNet structure and cell relaxation with independent final-force convergence checks.
+- CSV/JSON experiment records, a GPU smoke test, a 64-to-8 run, and Mock-based unit tests.
+- Agent integration, random-search comparisons, reference phase-diagram stability metrics and DFT validation remain future work.
+
+## Repository layout
+
+Keep this repository and Microsoft's MatterGen repository independent:
 
 ```text
-5040/
+~/gxq/5040/
 ├── AIST5040-Materials-Agent/
-├── mattergen/                    # https://github.com/microsoft/mattergen
-└── .venvs/mattergen/             # isolated Python 3.10 environment
+├── mattergen/
+└── .venvs/mattergen/
 ```
 
-`src/materials_agent` contains tools, agent, baselines and evaluation packages.
-`configs/default.json` contains initial experiment settings; agent and baseline modules are placeholders.
+The source packages are under `src/materials_agent/`. Experiment inputs live in `configs/`, documentation in `docs/`, and local generated data/results in the Git-ignored `results/` directory.
 
-## RTX 5090 setup
+## Environment
 
-From this repository, with `uv` available:
+The tested environment is Python 3.10.20, PyTorch 2.7.1+cu128, PyG 2.7.0, CHGNet 0.4.2 and an NVIDIA RTX 5090. The environment is isolated from Conda base at `~/gxq/5040/.venvs/mattergen`.
+
+Activate the existing environment and enter this repository:
 
 ```bash
-bash scripts/setup_mattergen.sh
+cd ~/gxq/5040/AIST5040-Materials-Agent
 source ../.venvs/mattergen/bin/activate
-python scripts/gpu_smoke_test.py
-OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES=0 python scripts/materials_smoke_test.py
 ```
 
-The setup installs into `../.venvs/mattergen`, without modifying Conda base.
-`configs/blackwell-overrides.txt` deliberately replaces MatterGen's Linux torch 2.2.1 pins with torch 2.7.1/cu128 and matching PyG wheels. `uv pip check` reports the three original torch/torchvision/torchaudio pin conflicts; these overrides are required for this GPU. Do not reinstall upstream dependencies without the overrides.
+`configs/blackwell-overrides.txt` holds the PyTorch/PyG versions required by the tested RTX 5090 setup; `configs/mattergen-environment.freeze.txt` records installed packages. See [docs/smoke-test.md](docs/smoke-test.md) for the GPU checks. To provision a new environment, use `bash scripts/setup_mattergen.sh`; it installs to the project-local environment, not Conda base.
 
-- PyTorch Blackwell support: https://pytorch.org/blog/pytorch-2-7/
-- PyG installation matrix: https://pytorch-geometric.readthedocs.io/en/2.7.0/install/installation.html
-- CHGNet: https://chgnet.lbl.gov/
+## Run fixed screening
 
-`configs/mattergen-environment.freeze.txt` records the installed versions. Editable paths are relative to this repository; use the setup script to apply the required package indexes and overrides.
-
-## Smoke pipeline
-
-The pipeline generates two crystals with `mattergen_base`, seed 42, and the default full diffusion schedule. Microsoft weights are downloaded automatically from Hugging Face. The MatterGen subprocess sets `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` to load the official checkpoint's configuration objects with PyTorch >=2.6; use this wrapper only with trusted official checkpoints.
-
-Generated CIFs, relaxed CIFs and `chgnet_report.json` are written under `results/smoke/` (ignored by Git). CHGNet runs on CUDA and relaxes positions and cell, with a maximum of 500 steps and force threshold 0.05 eV/Å. The report records whether the final atomic forces meet that threshold; this alone does not establish cell/stress convergence or thermodynamic stability. Prediction energies are eV/atom; relaxation trajectory energies are total eV.
-
-To rerun only CHGNet on the existing generated archive:
+Run the recorded formal configuration, generating 64 candidates and relaxing the ranked Top-8:
 
 ```bash
-python scripts/materials_smoke_test.py --skip-generation
+CUDA_VISIBLE_DEVICES=0 OMP_NUM_THREADS=4 materials-fixed-screening \
+  --candidate-dir results/fixed_v0/candidate_pool \
+  --output-dir results/fixed_v0 \
+  --generate-count 64 --generation-batch-size 4 --top-k 8 --seed 42 \
+  --checkpoint mattergen_base --device cuda:0 --fmax 0.05 --max-steps 500
 ```
 
-This validates generation and ML force-field execution. SUN metrics, reference-data comparisons, DFT validation, and the agent/baselines are future work. Model weights, environment files, data and results are excluded from commits.
+The exact configuration and completed run are recorded in [configs/fixed_v0.json](configs/fixed_v0.json) and [docs/experiment-log.md](docs/experiment-log.md). To screen an existing candidate pool, omit `--generate-count` and provide its path with `--candidate-dir`. Generation is optional so different ranking policies can share one pool.
+
+The executable can also be run without relying on the installed console script:
+
+```bash
+PYTHONPATH=src python -m materials_agent.baselines.fixed_screening --help
+```
+
+## Tests and scientific scope
+
+Run CPU-side unit tests with:
+
+```bash
+PYTHONPATH=src python -m pytest -q
+```
+
+The initial-force heuristic is only a ranking proxy. Low force does not establish stability, novelty or uniqueness; raw CHGNet energies from different compositions are not compared as stability scores. Relaxation success and force convergence are reported separately. See [docs/fixed-screening.md](docs/fixed-screening.md) for the algorithm, output schema, experiment settings and limitations.
