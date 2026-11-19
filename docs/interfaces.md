@@ -39,6 +39,10 @@ Candidate(
 
 Candidate IDs are opaque stable strings. For a shared pool, preserve CIF filenames and bytes; the existing baseline derives IDs from the sanitized filename stem plus a SHA256 content prefix. `cif_path` must be a relative `.cif` path and cannot escape the pool root. `cif_sha256` is optional in memory, but should be populated in a shared manifest. `features` is reserved for explicitly approved public/pre-screen fields. Contract validation rejects nested feature keys indicating relaxation, observations, final values, benchmark, MatterSim, stability labels or energy above hull; do not encode hidden labels in generic features.
 
+The optional `geometry-v1` feature extractor in `materials_agent.structure_features` parses the candidate CIF with pymatgen and derives atom count, element count, cell volume, density, six lattice parameters and elemental atomic fractions. It performs no model inference. Runtime visibility is opt-in with `RunConfig.allow_structure_features`; the exact allowlisted fields are copied to every planner's `State`, so a Classical Adaptive policy using the same runtime receives the same values as the LLM Agent. CIF parsing time is recorded separately from physics costs. `heuristic_search.py` is currently empty, so actual Classical Baseline integration remains to be checked when that policy is implemented.
+
+Pairwise structure similarity is not part of this initial feature set. It requires an agreed representation and matching threshold, and incurs pairwise CPU work; it should be separately configured and costed if added.
+
 ### Observation
 
 One `Observation` corresponds to one actual relaxation attempt. Status means:
